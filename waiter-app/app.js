@@ -2,6 +2,11 @@ const state = {
   menu: [],
   activeCategory: "ramen",
   cart: [],
+  promo: {
+    isThursday: false,
+    manualOverrideEnabled: false,
+    promoActive: false
+  },
   wizard: {
     open: false,
     step: 0,
@@ -26,6 +31,11 @@ const orderStatus = document.getElementById("orderStatus");
 
 const backendInput = document.getElementById("backendUrl");
 const saveBackend = document.getElementById("saveBackend");
+const promoButton = document.createElement("button");
+promoButton.id = "promoToggle";
+promoButton.type = "button";
+promoButton.className = saveBackend.className;
+saveBackend.parentElement.appendChild(promoButton);
 
 const wizardModal = document.getElementById("ramenWizard");
 const wizardStep = document.getElementById("wizardStep");
@@ -195,7 +205,8 @@ function renderCart() {
 
   const totals = calculateTotals();
   subtotalEl.textContent = formatPrice(totals.subtotal);
-  totalEl.textContent = formatPrice(totals.total);
+  const totalToShow = typeof totals.totalFinal === "number" ? totals.totalFinal : totals.total;
+  totalEl.textContent = formatPrice(totalToShow);
 }
 
 function removeCartItem(id) {
@@ -206,10 +217,40 @@ function removeCartItem(id) {
 
 function calculateTotals() {
   const subtotal = state.cart.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
+  const promoDiscount = calculatePromoDiscountForCart();
+  const total = subtotal;
+  const totalFinal = promoDiscount > 0 ? Math.max(total - promoDiscount, 0) : total;
   return {
     subtotal,
-    total: subtotal
+    total,
+    promoDiscount,
+    totalFinal
   };
+}
+
+function calculatePromoDiscountForCart() {
+  if (!state.promo.promoActive) {
+    return 0;
+  }
+  const prices = [];
+  state.cart.forEach((item) => {
+    if (typeof item.unitPrice !== "number" || typeof item.qty !== "number") {
+      return;
+    }
+    const product = getProductById(item.productId);
+    if (!product || product.category !== "ramen") {
+      return;
+    }
+    for (let i = 0; i < item.qty; i += 1) {
+      prices.push(item.unitPrice);
+    }
+  });
+  prices.sort((a, b) => b - a);
+  let discount = 0;
+  for (let i = 1; i < prices.length; i += 2) {
+    discount += prices[i];
+  }
+  return discount;
 }
 
 function buildRamenDetail(meta) {
@@ -428,7 +469,10 @@ async function sendOrder() {
       unitPrice: item.unitPrice,
       meta: item.meta || {}
     })),
-    totals
+    totals: {
+      subtotal: totals.subtotal,
+      total: totals.total
+    }
   };
 
   try {
@@ -466,10 +510,90 @@ saveBackend.addEventListener("click", () => {
     localStorage.setItem("DEKU_BACKEND_URL", value);
     window.DEKU_CONFIG.baseUrl = value;
     setStatus("URL backend guardada.");
+    loadPromoStatus();
   }
 });
 
 backendInput.value = window.DEKU_CONFIG.baseUrl;
+
+function updatePromoButton() {
+  if (state.promo.isThursday) {
+    promoButton.textContent = "2x1 AUTO";
+    promoButton.disabled = true;
+    return;
+  }
+  promoButton.disabled = false;
+  if (state.promo.manualOverrideEnabled) {
+    promoButton.textContent = "2x1 ON";
+  } else {
+    promoButton.textContent = "2x1 OFF";
+  }
+}
+
+async function loadPromoStatus() {
+  try {
+    const response = await fetch(`${window.DEKU_CONFIG.baseUrl}/api/promo`);
+    if (!response.ok) {
+      throw new Error("No se pudo cargar promo");
+    }
+    const data = await response.json();
+    state.promo = {
+      isThursday: Boolean(data.isThursday),
+      manualOverrideEnabled: Boolean(data.manualOverrideEnabled),
+      promoActive: Boolean(data.promoActive)
+    };
+  } catch (error) {
+    console.error(error);
+    state.promo = {
+      isThursday: false,
+      manualOverrideEnabled: false,
+      promoActive: false
+    };
+  }
+  updatePromoButton();
+  renderCart();
+}
+
+async function updatePromoOverride(enabled) {
+  try {
+    const response = await fetch(`${window.DEKU_CONFIG.baseUrl}/api/promo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ manualOverrideEnabled: enabled })
+    });
+    if (!response.ok) {
+      throw new Error("No se pudo actualizar promo");
+    }
+    const data = await response.json();
+    state.promo = {
+      isThursday: Boolean(data.isThursday),
+      manualOverrideEnabled: Boolean(data.manualOverrideEnabled),
+      promoActive: Boolean(data.promoActive)
+    };
+  } catch (error) {
+    console.error(error);
+    setStatus("No se pudo actualizar promo.");
+  }
+  updatePromoButton();
+  renderCart();
+}
+
+promoButton.addEventListener("click", async () => {
+  if (state.promo.isThursday) {
+    return;
+  }
+  if (!state.promo.manualOverrideEnabled) {
+    const confirmed = confirm(
+      "⚠️ Estás activando 2x1 fuera de jueves. Esto quedará registrado. ¿Continuar?"
+    );
+    if (!confirmed) {
+      return;
+    }
+    await updatePromoOverride(true);
+  } else {
+    await updatePromoOverride(false);
+  }
+});
 
 async function init() {
   try {
@@ -483,6 +607,7 @@ async function init() {
     console.error(error);
     setStatus("No se pudo cargar menú.");
   }
+  await loadPromoStatus();
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch((error) => console.error(error));

@@ -12,6 +12,7 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, "data");
 const MENU_PATH = path.join(DATA_DIR, "menu.json");
 const ORDERS_PATH = path.join(DATA_DIR, "orders.json");
+const PROMO_PATH = path.join(DATA_DIR, "promo.json");
 
 app.use(express.json({ limit: "1mb" }));
 
@@ -47,6 +48,66 @@ function loadOrders() {
 
 function saveOrders(orders) {
   safeWriteJson(ORDERS_PATH, orders);
+}
+
+function loadPromo() {
+  const fallback = {
+    manualOverrideEnabled: false,
+    updatedAt: new Date().toISOString()
+  };
+  if (!fs.existsSync(PROMO_PATH)) {
+    safeWriteJson(PROMO_PATH, fallback);
+    return fallback;
+  }
+  const data = safeReadJson(PROMO_PATH, fallback);
+  return {
+    manualOverrideEnabled: typeof data.manualOverrideEnabled === "boolean"
+      ? data.manualOverrideEnabled
+      : false,
+    updatedAt: data.updatedAt || fallback.updatedAt
+  };
+}
+
+function savePromo(promo) {
+  safeWriteJson(PROMO_PATH, promo);
+}
+
+function isThursdayMexicoCity(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    timeZone: "America/Mexico_City"
+  });
+  return formatter.format(date) === "Thu";
+}
+
+function getPromoStatus() {
+  const promo = loadPromo();
+  const isThursday = isThursdayMexicoCity();
+  const promoActive = isThursday || promo.manualOverrideEnabled;
+  return { promo, isThursday, promoActive };
+}
+
+function calculatePromoDiscount(items, menu) {
+  const prices = [];
+  const products = menu.products || [];
+  items.forEach((item) => {
+    if (!item || typeof item.unitPrice !== "number" || typeof item.qty !== "number") {
+      return;
+    }
+    const product = products.find((entry) => entry.id === item.productId);
+    if (!product || product.category !== "ramen") {
+      return;
+    }
+    for (let i = 0; i < item.qty; i += 1) {
+      prices.push(item.unitPrice);
+    }
+  });
+  prices.sort((a, b) => b - a);
+  let discount = 0;
+  for (let i = 1; i < prices.length; i += 2) {
+    discount += prices[i];
+  }
+  return discount;
 }
 
 function broadcast(event, data) {
@@ -88,10 +149,44 @@ app.get("/api/orders", (req, res) => {
   res.json(orders);
 });
 
+app.get("/api/promo", (req, res) => {
+  const { promo, isThursday, promoActive } = getPromoStatus();
+  res.json({
+    isThursday,
+    manualOverrideEnabled: promo.manualOverrideEnabled,
+    promoActive
+  });
+});
+
+app.post("/api/promo", (req, res) => {
+  if (typeof req.body.manualOverrideEnabled !== "boolean") {
+    return res.status(400).json({ error: "manualOverrideEnabled inválido." });
+  }
+  const promo = loadPromo();
+  promo.manualOverrideEnabled = req.body.manualOverrideEnabled;
+  promo.updatedAt = new Date().toISOString();
+  savePromo(promo);
+  const isThursday = isThursdayMexicoCity();
+  const promoActive = isThursday || promo.manualOverrideEnabled;
+  res.json({
+    isThursday,
+    manualOverrideEnabled: promo.manualOverrideEnabled,
+    promoActive
+  });
+});
+
 app.post("/api/orders", (req, res) => {
   const error = validateOrderPayload(req.body);
   if (error) {
     return res.status(400).json({ error });
+  }
+
+  const menu = loadMenu();
+  const { isThursday, promoActive } = getPromoStatus();
+  const promoDiscount = promoActive ? calculatePromoDiscount(req.body.items, menu) : 0;
+  const totals = { ...req.body.totals };
+  if (promoActive) {
+    totals.totalFinal = Math.max(totals.total - promoDiscount, 0);
   }
 
   const orders = loadOrders();
@@ -100,8 +195,13 @@ app.post("/api/orders", (req, res) => {
     createdAt: new Date().toISOString(),
     status: "pending",
     items: req.body.items,
-    totals: req.body.totals,
-    notes: req.body.notes || ""
+    totals,
+    notes: req.body.notes || "",
+    promoApplied: promoActive,
+    promoType: "2x1_jueves",
+    promoSource: isThursday ? "auto_thursday" : "manual_override",
+    promoDiscount,
+    promoTimestamp: new Date().toISOString()
   };
   orders.push(order);
   saveOrders(orders);
