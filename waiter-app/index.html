@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deku Ramen POS</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="top-bar">
+    <div>
+      <h1>Deku Ramen POS</h1>
+      <p class="subtitle">Comanda rápida · Touch-first</p>
+    </div>
+    <div class="settings">
+      <label for="backendUrl">Backend</label>
+      <input id="backendUrl" type="text" placeholder="http://localhost:3000" />
+      <button id="saveBackend">Guardar</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="categories" id="categoryList">
+      <button class="category active" data-category="ramen">Ramen</button>
+      <button class="category" data-category="extras">Extras</button>
+      <button class="category" data-category="sides">Acompañamientos</button>
+      <button class="category" data-category="drinks">Bebidas</button>
+    </aside>
+
+    <section class="products">
+      <h2 id="categoryTitle">Ramen</h2>
+      <div id="productGrid" class="product-grid"></div>
+    </section>
+
+    <aside class="cart">
+      <h2>Ticket</h2>
+      <div id="cartItems" class="cart-items"></div>
+      <div class="cart-summary">
+        <div>
+          <span>Subtotal</span>
+          <strong id="subtotal">$0</strong>
+        </div>
+        <div>
+          <span>Total</span>
+          <strong id="total">$0</strong>
+        </div>
+      </div>
+      <button id="sendOrder" class="primary">ENVIAR A COCINA</button>
+      <p id="orderStatus" class="status"></p>
+    </aside>
+  </main>
+
+  <section id="ramenWizard" class="modal hidden">
+    <div class="modal-content">
+      <header>
+        <h2 id="wizardTitle">Configura tu ramen</h2>
+        <button id="closeWizard" class="ghost">Cerrar</button>
+      </header>
+      <div class="wizard-step" id="wizardStep"></div>
+      <footer class="wizard-footer">
+        <button id="wizardBack" class="ghost">Atrás</button>
+        <button id="wizardNext" class="primary">Siguiente</button>
+      </footer>
+    </div>
+  </section>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

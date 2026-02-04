@@ -1,0 +1,110 @@
+:root {
+  font-family: "Segoe UI", sans-serif;
+  --bg: #111827;
+  --card: #1f2937;
+  --accent: #f97316;
+  --ready: #22c55e;
+  --pending: #f59e0b;
+  --text: #f9fafb;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: #0f172a;
+  border-bottom: 1px solid #1f2937;
+}
+
+.orders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  padding: 16px;
+}
+
+.order-card {
+  background: var(--card);
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid #374151;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.badge.pending {
+  background: var(--pending);
+}
+
+.badge.preparing {
+  background: var(--accent);
+}
+
+.badge.ready {
+  background: var(--ready);
+}
+
+.order-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-items strong {
+  display: block;
+}
+
+.order-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.order-actions button {
+  flex: 1;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.order-actions .prepare {
+  background: var(--accent);
+  color: #fff;
+}
+
+.order-actions .ready {
+  background: var(--ready);
+  color: #0f172a;
+}
+
+.small {
+  font-size: 12px;
+  color: #cbd5f5;
+}

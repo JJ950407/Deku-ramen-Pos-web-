@@ -1,0 +1,14 @@
+{
+  "name": "deku-ramen-pos-beta",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deku Ramen POS beta (LAN).",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.17.0"
+  }
+}
